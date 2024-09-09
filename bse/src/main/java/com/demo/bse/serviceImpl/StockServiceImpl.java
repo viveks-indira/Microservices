@@ -24,7 +24,7 @@ public class StockServiceImpl implements StockService {
         return stocks.stream()
                 .map(stock -> new StockResponse(stock.getSymbol(),stock.getName(),stock.getPrice()
                         ,stock.getDayLow(),stock.getDayHigh(),stock.getYearLow(),stock.getYearHigh(),stock.getMarketCap()
-                        ,stock.getExchange(),stock.getOpen(),stock.getPrevClose()))
+                        ,stock.getExchange() ,stock.getOpen(),stock.getPrevClose()))
                 .collect(Collectors.toList());
     }
     @Override

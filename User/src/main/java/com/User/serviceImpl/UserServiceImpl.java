@@ -1,16 +1,19 @@
 package com.User.serviceImpl;
 
 import com.User.entity.*;
-import com.User.feign.BseClient;
-import com.User.feign.NseClient;
+import com.User.client.BseClient;
 import com.User.repository.StockRepository;
 import com.User.repository.UserRepository;
+import com.User.service.BseClientService;
+import com.User.service.NseClientService;
 import com.User.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,9 +30,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Autowired
-    private BseClient bseClient; // Inject Feign Client
+    private BseClientService bseClientService; // Inject Feign Client
     @Autowired
-    private NseClient nseClient; // Inject Feign Client
+    private NseClientService nseClientService; // Inject Feign Client
 
     @Override
     public List<UserResponse> getAllUsers() {
@@ -61,16 +64,52 @@ public class UserServiceImpl implements UserService {
         return userRepository.save(user);
     }
 
+//    @Override
+//    public User updateUser(String clientId, User user) {
+//        User existingUser = userRepository.findByClientId(clientId);
+//        existingUser.setName(user.getName());
+//        existingUser.setPhone(user.getPhone());
+//        existingUser.setEmail(user.getEmail());
+//        existingUser.setCity(user.getCity());
+//        existingUser.setLastTradeDate(user.getLastTradeDate());
+//        return userRepository.save(existingUser);
+//    }
+
     @Override
-    public User updateUser(String clientId, User user) {
+    public UserResponse updateUser(String clientId, Map<String, Object> updates) {
         User existingUser = userRepository.findByClientId(clientId);
-        existingUser.setName(user.getName());
-        existingUser.setPhone(user.getPhone());
-        existingUser.setEmail(user.getEmail());
-        existingUser.setCity(user.getCity());
-        existingUser.setLastTradeDate(user.getLastTradeDate());
-        return userRepository.save(existingUser);
+        if (existingUser == null) {
+            throw new RuntimeException("User not found with client ID: " + clientId);
+        }
+
+        // Apply updates dynamically
+        updates.forEach((key, value) -> {
+            switch (key) {
+                case "name":
+                    existingUser.setName((String) value);
+                    break;
+                case "email":
+                    existingUser.setEmail((String) value);
+                    break;
+                case "phone":
+                    existingUser.setPhone((String) value);
+                    break;
+                case "city":
+                    existingUser.setCity((String) value);
+                    break;
+                // Add more fields as necessary
+                default:
+                    throw new IllegalArgumentException("Invalid field: " + key);
+            }
+        });
+
+        // Save the updated user
+        User updatedUser = this.userRepository.save(existingUser);
+        UserResponse userResponse=new UserResponse(updatedUser.getClientId(),updatedUser.getName(),updatedUser.getEmail(),
+                updatedUser.getPhone(),updatedUser.getCity(),updatedUser.getLastTradeDate());
+        return userResponse;
     }
+
 
     @Override
     public boolean deleteUser(Long clientId) {
@@ -87,11 +126,21 @@ public class UserServiceImpl implements UserService {
 
         try {
             // Fetch stock details from BSE microservice
-            List<StockResponse> bseStocks = bseClient.getAllStocks();
-            allStocks.addAll(bseStocks.stream()
-                    .map(stock -> new StockResponse(stock.getSymbol(), stock.getName(), stock.getPrice(), stock.getDayLow(), stock.getDayHigh(),
-                            stock.getYearLow(), stock.getYearHigh(), stock.getMarketCap(), stock.getExchange(), stock.getOpen(), stock.getPrevClose()))
-                    .collect(Collectors.toList()));
+            Flux<StockResponse> bseStocksFlux = bseClientService.getAllStocks();
+            System.out.println("ALl Stocks " + bseStocksFlux);
+            bseStocksFlux.subscribe(
+                    stock -> allStocks.add(stock), // On next
+                    e -> {
+                        // Handle error
+                        System.out.println("BSE service is not available: " + e.getMessage());
+                        // Optionally, fetch data from another service here
+                    },
+                    () -> {
+                        // Complete
+                        System.out.println("Finished fetching BSE stocks.");
+                    }
+            );
+
         } catch (Exception e) {
             // Log the exception and proceed with data from the other service
             System.out.println("BSE service is not available.");
@@ -99,11 +148,21 @@ public class UserServiceImpl implements UserService {
 
         try {
             // Fetch stock details from NSE microservice
-            List<StockResponse> nseStocks = nseClient.getAllStocks();
-            allStocks.addAll(nseStocks.stream()
-                    .map(stock -> new StockResponse(stock.getSymbol(), stock.getName(), stock.getPrice(), stock.getDayLow(), stock.getDayHigh(),
-                            stock.getYearLow(), stock.getYearHigh(), stock.getMarketCap(), stock.getExchange(), stock.getOpen(), stock.getPrevClose()))
-                    .collect(Collectors.toList()));
+            Flux<StockResponse> nseStocksFlux = nseClientService.getAllStocks();
+            System.out.println("ALl Stocks " + nseStocksFlux);
+            nseStocksFlux.subscribe(
+                    stock -> allStocks.add(stock), // On next
+                    e -> {
+                        // Handle error
+                        System.out.println("NSE service is not available: " + e.getMessage());
+                        // Optionally, fetch data from another service here
+                    },
+                    () -> {
+                        // Complete
+                        System.out.println("Finished fetching NSE stocks.");
+                    }
+            );
+
         } catch (Exception e) {
             // Log the exception and proceed with data from the other service
             System.out.println("NSE service is not available.");

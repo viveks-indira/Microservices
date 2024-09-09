@@ -3,9 +3,9 @@ package com.User.service;
 import com.User.entity.User;
 import com.User.entity.StockResponse;
 import com.User.entity.UserResponse;
-import com.User.entity.UserWithStocksResponse;
 
 import java.util.List;
+import java.util.Map;
 
 public interface UserService {
 
@@ -13,9 +13,10 @@ public interface UserService {
 
     User getUserByClientId(String clientId);
 
+
     User createUser(User user);
 
-    User updateUser(String clientId, User user);
+    UserResponse updateUser(String clientId, Map<String, Object> updates);
 
     boolean deleteUser(Long clientId);
 

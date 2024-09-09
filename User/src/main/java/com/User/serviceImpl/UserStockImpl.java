@@ -19,14 +19,17 @@ public class UserStockImpl implements UserStockService {
     @Autowired
     private StockRepository stockRepository;
 
-    @Override
-    public User getUserByClientId(String clientId) {
-        return userRepository.findByClientId(clientId);
-    }
 
     @Override
     public UserWithStocksResponse getUserWithStocks(String clientId) {
-        User user = getUserByClientId(clientId);
+
+
+        User user = userRepository.findByClientId(clientId);
+        if (user == null) {
+            throw new RuntimeException("User not found with client ID: " + clientId);
+        }
+
+        // Map User entity to UserResponse DTO
         UserResponse userSend=new UserResponse();
         userSend.setClientId(user.getClientId());
         userSend.setName(user.getName());
@@ -35,6 +38,7 @@ public class UserStockImpl implements UserStockService {
         userSend.setCity(user.getCity());
         userSend.setLastTradeDate(user.getLastTradeDate());
 
+        // Fetch and map stocks related to the user
         List<Stock> userStocks= stockRepository.findByUserClientId(clientId);
 
         List<UserStockResponse> stockResponses = userStocks.stream()
@@ -42,6 +46,22 @@ public class UserStockImpl implements UserStockService {
                         stock.getQuantity(),stock.getExchange()))
                 .collect(Collectors.toList());
         return new UserWithStocksResponse(userSend, stockResponses);
+    }
+
+    @Override
+    public User buyStock(Stock stock,String clientId) {
+        User user = userRepository.findByClientId(clientId);
+        if (user == null) {
+            throw new RuntimeException("User not found with client ID: " + clientId);
+        }
+
+        // Set user to the stock
+        stock.setUser(user);
+
+        // Save the stock with the associated user
+        stockRepository.save(stock);
+
+        return user; // Return the user after successful stock purchase
     }
 
 
